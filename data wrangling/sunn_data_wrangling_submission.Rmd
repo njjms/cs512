@@ -1,0 +1,295 @@
+---
+title: "Data Wrangling Assignment"
+author: "Nick Sun"
+date: "1/29/2020"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Process
+
+Blink-182 was one of my favorite bands growing up and certainly falls into the category of bands that have changed their sound over the years.
+Their new style is noticeably more pop and less juvenile than their earlier work, but some elements, such as the use of repetitive melodic recitatives (example: “na na na na na na”) remain the same.
+
+I thought it might be interesting to gather a corpus of Blink-182 lyrics to analyze.
+While there are APIs that have lyrical content for certain artists available, I decided to use web scraping instead since many fan sourced sites have transcriptions of live songs that are not found on commercial APIs.
+The site I used is azlyrics.com since it contains not only the song lyrics but album information and year of release.
+I used Python for this assignment, specifically the `BeautifulSoup` and `requests` libraries.
+
+The first step to getting a corpus of lyrics is getting a list of all the songs available for that artist on azlyrics.
+This can be done by getting the html for Blink-182 artists page and then using a basic CSS selector to grab both the names of all the songs and the corresponding href attribute for the URL to the individual lyrics page and storing this information as dictionaries.
+Overall there are 176 songs on azlyrics.com for Blink-182, so 176 dictionaries will be created and stored together in a list.
+
+Afterwards, I converted this list of dictionaries into a pandas dataframe to iterate through the list of song URLs.
+These URLs led to individual song pages that contained both the lyrics and other information such as the album and year of release.
+The lyrics were contained in a div that did not have any identifying attributes, so the only way to get to this text in the DOM is to use a CSS selector.
+Thankfully, the individual song pages all have about the same format with only some variation.
+The text did need to be cleaned slightly since it contained newline and carriage return whitespace characters.
+
+Scraping the other information off the page was slightly more complicated since the div which contains the album name and release date needs to be cleaned using regular expressions.
+However, some trial and error eventually yielded the correct expression to extract both the album name and the year.
+There are likely some edge cases that are being missed with this particular regex, such as Unicode characters, but for the Blink-182 discography this approach seems to work.
+
+Some other considerations that I had were using an inner join to connect the dataframe containing the song information with the original dataframe containing all the song titles and URLs.
+Finally, I had to make sure to put a sleep in between scrapes of the individual song pages, since otherwise azlyrics.com would think I am malicious traffic and block me from their server.
+This took a few tries to get right, since it was difficult for me to estimate how quick I could make the sleeps without being blocked.
+I did implement a print statement to stdout so I could tell if and where the script stopped working.
+The final corpus of lyrics was exported using pandas as both a csv and json file.
+
+Some fun ideas I have for this dataset include analyzing the sentiment of Blink-182 songs over time, charting the length of songs between different albums, or possibly training a Markov Chain to write my own Blink-182 songs!
+
+# Initial Data
+
+The initial data of this project were HTML webpages.
+
+From the scale provided on this assignment, I estimate that the data is suitable for this assignment.
+Using the assignment point system as a checklist, here is how the web scraped lyrics corpus matches up:
+
++ Was mostly in a standardized form, but some songs' pages were structured differently (for example, to accomodate featured artists) so the script had to be adjusted accordingly for those songs
++ Data was split across multiple webpages, and hence, multple HTML files
++ Data is in a format other than CSV, JSON, or in a database
++ Data does contain punctuations, but for the purposes of this assignment I opted not to remove them
++ Dataset is relatively small at only 212KB total
++ The way I scraped the data involved a two dataframes, one listing the songs, and one with the song information and between the two of them there are a few types of related data (ex: year vs album name)
++ Data was accessed using `requests` library, not downloading a file or connecting to a database
+
+Some of the points will be subjective, but I estimate the difficulty of this dataset to be at least a 4.
+
+Below is an excerpt of an example song lyrics webpage from azlyrics.com, with only the relevant sections which I scrape data from.
+These individual sections are separated with an ellipsis.
+
+```
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta content="IE=edge" http-equiv="X-UA-Compatible"/>
+<meta content="width=device-width, initial-scale=1" name="viewport"/>
+<meta content="Blink-182 &quot;Brohemian Rhapsody&quot;: There's something about you That I can't quite put my finger in..." name="description"/>
+<meta content="Brohemian Rhapsody lyrics, Blink-182 Brohemian Rhapsody lyrics, Blink-182 lyrics" name="keywords"/>
+<meta content="noarchive" name="robots"/>
+<meta content="//www.azlyrics.com/az_logo_tr.png" property="og:image"/>
+<title>Blink-182 - Brohemian Rhapsody Lyrics | AZLyrics.com</title>
+...
+<div class="div-share"><h1>"Brohemian Rhapsody" lyrics</h1></div>
+<div class="lyricsh">
+<h2><b>Blink-182 Lyrics</b></h2>
+</div>
+<div class="ringtone">
+<span id="cf_text_top"></span>
+</div>
+<b>"Brohemian Rhapsody"</b><br/>
+<br/>
+<div>
+<!-- Usage of azlyrics.com content by any third-party lyrics provider is prohibited by our licensing agreement. Sorry about that. -->
+There's something about you <br/>
+That I can't quite put my finger in
+</div>
+<br/><br/>
+...
+<script type="text/javascript">
+ArtistName = "Blink-182";
+SongName = "Brohemian Rhapsody";
+function submitCorrections(){
+	document.getElementById('corlyr').submit();
+	return false;
+}
+</script>
+```
+
+# Example Data: CSV
+
+Below are the first few rows of the resulting csv.
+Note that a column of this data is song lyrics, held as a string, which takes a large amount of space and cannot be
+accurately displayed on the document.
+
+Additionally, I can provide the actual csv files as proof of the extraction working correctly.
+
+```
+title,url,lyrics,album_name,year
+Reebok Commercial,https://www.azlyrics.com/lyrics/blink182/reebokcommercial.html,"You are better than me,girls,money,and everything I try to compete with you,   but you beat me at everything i do   I see in you the things that I would like to be   But im different from you,   So you will have to be like me!   I cannot be bought my personality is what I choose   I was brought up without a silver cup I wont  covet the things owned by you   For all the world material things are now more and more   jealousy for you and me  I won't covet the things owned by your store",Flyswatter,1992
+Time,https://www.azlyrics.com/lyrics/blink182/time.html,When the clock strikes two There's so much to do And I cant explain what I need  Jobs and social groups Hearing the latest news Keeping your reputation clean  And I don't wanna worry About being on time I see the way you hurry And time runs your life again  The difference between east and west Money means so much less And objects aren't so important to buy  I wish that earth clock Could often just be stopped And then we look into the time  And I don't wanna worry About being on time I see the way you hurry And time runs your life again,Flyswatter,1992
+Red Skies,https://www.azlyrics.com/lyrics/blink182/redskies.html,"Why can't people just understand  money's something in the nature of the hand  now as we need something to help us with  all used up and nothing more to give   Change for the better  no more laziness kills like murder  help another you want for someday  you cant hide while I'm running   And all these people they don't comprehend  all those obscure animals aren't even in their pen  along the wheels comes the pain and strife,  ?   Change for the better  no more laziness kills like murder  help another you want for someday  you cant hide while I'm running   And all these people they don't comprehend  all those obscure animals aren't even in their pen  along the wheels comes the pain and strife,  ?   Change for the better  no more laziness kills like murder  help another you want for someday  you cant hide while I'm running   Change for the better  no more laziness kills like murder  help another you want for someday  you cant hide while I'm running",Flyswatter,1992
+Alone,https://www.azlyrics.com/lyrics/blink182/alone.html,"what were doing here, now  no one knows  the thoughts, the things that i dont know  images all but a mind blur  your laughter has drived you here  you can do what you want to  i need some time alone  between what answers there is  i need some time alone  dont talk to me  dont notice me  dont talk to me  dont notice me   images all but a mind blur  your laughter has drived you here  not in the mood, not just to justify  and not to think of what a lie  you can do what you want to  i need some time alone  between what answers there is  i need some time alone  dont talk to me  dont notice me  dont talk to me  dont notice me",Flyswatter,1992
+```
+
+If the above is not sufficient, here is a screenshot of the csv in Excel:
+
+![](loaded_csv.png)
+
+# Example Data: JSON
+
+This data is output using the `to_json` method in pandas DataFrames.
+By default, it outputs the data as `orient='index'`, but can instead be output in other formats.
+In the example below, I output it with `orient='records'`.
+
+```
+[
+  {
+    "title": "Reebok Commercial",
+    "url": "https://www.azlyrics.com/lyrics/blink182/reebokcommercial.html",
+    "lyrics": "You are better than me,girls,money,and everything I try to compete with you,   but you beat me at everything i do   I see in you the things that I would like to be   But im different from you,   So you will have to be like me!   I cannot be bought my personality is what I choose   I was brought up without a silver cup I wont  covet the things owned by you   For all the world material things are now more and more   jealousy for you and me  I won't covet the things owned by your store",
+    "album_name": "Flyswatter",
+    "year": "1992"
+  },
+  {
+    "title": "Time",
+    "url": "https://www.azlyrics.com/lyrics/blink182/time.html",
+    "lyrics": "When the clock strikes two There's so much to do And I cant explain what I need  Jobs and social groups Hearing the latest news Keeping your reputation clean  And I don't wanna worry About being on time I see the way you hurry And time runs your life again  The difference between east and west Money means so much less And objects aren't so important to buy  I wish that earth clock Could often just be stopped And then we look into the time  And I don't wanna worry About being on time I see the way you hurry And time runs your life again",
+    "album_name": "Flyswatter",
+    "year": "1992"
+  }
+]
+```
+
+# Example of the Loaded Data
+
+Below is the head of the csv after it is loaded into RStudio using `readr`.
+
+![](loaded_data.png)
+
+And here is how it actually appears in `Rstudio` using the `knitr` package.
+
+```{r, echo=FALSE, message = FALSE}
+library(readr)
+library(kableExtra)
+blink_songs <- read_csv("example_data/blink_songs.csv")
+kable(head(blink_songs, n = 2))
+```
+
+
+# Scripts
+
+The Python module I wrote to scrape the data is provided below.
+Additionally, I have a utility function written using the pandas library to convert json files to csv.
+
+```
+#!/usr/bin/env python
+
+import pandas as pd
+import requests
+import time
+import re
+from bs4 import BeautifulSoup
+
+def get_songs(url):
+    """
+    Function to get list of songs and corresponding URLs under an artist page
+    Input: url to an artist's page on azlyrics.com
+    Output: Returns a list of dicts ({'title' : [TITLE], 'url' : [URL]})
+    """
+    songlist = requests.get(url)
+    soup = BeautifulSoup(songlist.text)
+
+    songinfo = []
+
+    for row in soup.findAll('div', attrs = {'class' : 'listalbum-item'}):
+        song = {}
+        song['title'] = row.a.text
+        song['url'] = row.a['href'].replace("..", "https://www.azlyrics.com")
+        songinfo.append(song)
+
+    return(songinfo)
+
+def get_song_info(url):
+    """
+    Function to get lyrics, album, and year information for individual song
+    Input: url to a song's page on azlyrics.com
+    Output: Dict ({'lyrics' : [string LYRICS],
+                   'url' : [string URL],
+                   'album_name' : [string ALBUM_NAME],
+                   'year': [int YEAR]})
+    """
+    tmp = requests.get(url)
+    tmpsoup = BeautifulSoup(tmp.text)
+    
+    try:
+        tmpalbum = tmpsoup.find('div', attrs = {'class' : 'songinalbum_title'}).text.replace("album: ", "")
+        albumpattern = r'"([A-Za-z0-9]*)"'
+        album_name = re.search(albumpattern, tmpalbum).group(0).replace('\"', '')
+    
+        yearpattern = r'\([0-9]*\)'
+        album_year = re.search(yearpattern, tmpalbum).group(0).replace('(', '').replace(')', '')
+    except:
+        album_name = "None"
+        album_year = 0
+    
+    try:
+        tmplyrics = tmpsoup.select('body > div.container.main-page > div > div.col-xs-12.col-lg-8.text-center > div:nth-child(8)')[0].text
+        lyrics = tmplyrics.replace('\n', ' ').replace('\r', ' ').strip()
+    except:
+        tmplyrics = tmpsoup.select('body > div.container.main-page > div > div.col-xs-12.col-lg-8.text-center > div:nth-child(10)')[0].text
+        lyrics = tmplyrics.replace('\n', ' ').replace('\r', ' ').strip()
+    
+    output = {}
+    output['lyrics'] = lyrics
+    output['album_name'] = album_name
+    output['year'] = album_year
+    output['url'] = url
+    
+    return(output)
+
+def json_to_csv(json_file):
+    '''
+    Converts json to csv files.
+
+    Args:
+        json_file (str) : PATH to json file
+
+    Returns:
+        .csv file in current working directory
+    '''
+        
+    try:
+        df = pd.read_json(json_file)
+        output = df.to_csv(encoding='utf-8', 
+                           index=False)
+        return(output)
+    except:
+        print("Error in converting to json")
+```
+
+The actual `main.py` file to run the script is provided here:
+
+```
+from lyrics_scraper import get_song_info, get_songs
+
+import pandas as pd
+import requests
+import time
+import re
+from bs4 import BeautifulSoup
+
+url = 'https://www.azlyrics.com/b/blink.html'
+
+songinfo = get_songs(url)
+
+blink = []
+
+for song in songinfo:
+    print("Working on: {}".format(song['title']))
+    song_output = get_song_info(song['url'])
+    blink.append(song_output)
+    time.sleep(10)
+
+song_info = pd.DataFrame(songinfo)
+song_lyrics = pd.DataFrame(blink)
+
+blink_songs = pd.merge(left = song_info, 
+                       right = song_lyrics, 
+                       left_on = 'url',
+                       right_on = 'url')
+
+blink_songs = blink_songs.drop_duplicates()
+
+blink_songs.to_csv(r'blink_songs.csv',
+                  index = None,
+                  header = True)
+
+blink_songs.to_json(r'blink_songs.json')
+
+```
